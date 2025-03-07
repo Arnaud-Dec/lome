@@ -1,0 +1,18 @@
+services:
+  ollama-server:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - /tmp/ollama/data:/root/.ollama  
+
+  flask-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "5000:5000"
+    environment:
+      - FLASK_ENV=development
+    depends_on:
+      - ollama-server
