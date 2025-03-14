@@ -17,5 +17,5 @@ COPY . .
 # Exposer le port sur lequel Flask va tourner
 EXPOSE 5000
 
-# Lancer l'application Flask avec un délai pour s'assurer qu'Ollama est bien démarré
+# Lancer l'application Flask
 CMD ["python", "app/app.py"]

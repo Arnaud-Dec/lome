@@ -1,14 +1,22 @@
+
 services:
   ollama-server:
     image: ollama/ollama:latest
     container_name: ollama-server
-    # Commande correcte pour ollama
     command: serve
     ports:
       - "11434:11434"
     volumes:
       - C:/Users/nauna/Desktop/lome/volume:/root/.ollama
     restart: always
+    networks:
+      - app-network
+
+  redis:
+    image: redis:latest
+    container_name: redis
+    ports:
+      - "6379:6379"
     networks:
       - app-network
 
@@ -23,8 +31,11 @@ services:
       - FLASK_ENV=development
       - OLLAMA_HOST=ollama-server
       - OLLAMA_PORT=11434
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
     depends_on:
       - ollama-server
+      - redis
     networks:
       - app-network
 
