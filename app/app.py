@@ -1,8 +1,7 @@
 from flask import Flask, request, jsonify
-import requests, time, os, json, redis
-import datetime
-app = Flask(__name__)
+import requests, time, os, json, redis, datetime
 
+app = Flask(__name__)
 
 # Récupérer les informations de connexion depuis les variables d'environnement
 OLLAMA_HOST = os.environ.get('OLLAMA_HOST', 'ollama-server')
@@ -35,7 +34,15 @@ def format_context_for_prompt(context):
     formatted = []
     for msg in context:
         timestamp = msg.get("timestamp", "inconnu")
-        author = "Utilisateur" if msg["author"] == "user" else "Assistant"
+        # On considère "system" comme Système si présent
+        if msg["author"] == "user":
+            author = "Utilisateur"
+        elif msg["author"] == "bot":
+            author = "Assistant"
+        elif msg["author"] == "system":
+            author = "Système"
+        else:
+            author = msg["author"]
         content = msg["content"]
         formatted.append(f"[{timestamp}] {author}: {content}")
     return "\n".join(formatted)
@@ -47,19 +54,44 @@ def generate():
     prompt = data.get('prompt', '')
     model = data.get('model', 'llama3.2')
 
-    # Récupérer le contexte
+    # Récupérer le contexte existant
     stored_context = redis_client.get(session_id)
     context = json.loads(stored_context) if stored_context else []
 
-    # Ajouter le prompt actuel avec un timestamp
+    # Si c'est une nouvelle session, ajouter le prompt système pour guider le bot
+    if not context:
+        startup_prompt = {
+            "timestamp": get_timestamp(),
+            "author": "system",
+            "content": (
+                "Tu es LOME, un HomeAssistant spécialisé dans le contrôle des lumières dans une maison. "
+                "Ton rôle est strictement de recevoir et d'exécuter des commandes pour allumer ou éteindre les lumières, "
+                "et de répondre de manière claire aux utilisateurs.\n\n"
+                "Instructions pour répondre aux commandes concernant les lumières :\n"
+                "1. Si la demande concerne le contrôle des lumières, répond d'abord par une phrase claire destinée à l'utilisateur "
+                "(par exemple : \"Très bien, j'allume la lumière du salon\").\n"
+                "2. Ensuite, sur une nouvelle ligne, renvoie un JSON EXACT contenant exactement deux champs :\n"
+                "   - \"nom\" : le nom de la lumière (par exemple, \"lumiere salon\").\n"
+                "   - \"action\" : l'action à effectuer, qui peut être \"on\" ou \"off\".\n\n"
+                "Par exemple, pour la commande \"allume lumière 1\", ta réponse doit ressembler à :\n"
+                "Très bien, j'allume la lumière 1.\n"
+                "{\"nom\": \"lumiere 1\", \"action\": \"on\"}\n\n"
+                "Si la demande ne concerne pas le contrôle des lumières, répond de manière classique sans inclure de JSON dans ta réponse.\n\n"
+                "Rappelle-toi : tu t'appelles LOME et ton objectif principal est de contrôler les lumières en suivant ces instructions précises."
+            )
+        }
+        context.append(startup_prompt)
+
+    # Ajouter le message de l'utilisateur avec un timestamp
     context.append({
         "timestamp": get_timestamp(),
         "author": "user",
         "content": prompt
     })
 
-    # Formater le contexte pour le prompt d'Ollama
+    # Construire le prompt complet envoyé à Ollama
     formatted_context = format_context_for_prompt(context)
+    # On peut ajouter une marque indiquant le moment actuel
     full_prompt = f"{formatted_context}\n[Maintenant] Utilisateur: {prompt}"
 
     data_to_send = {
@@ -68,6 +100,7 @@ def generate():
     }
 
     try:
+        app.logger.info(f"Envoi de la requête à Ollama: {OLLAMA_URL}")
         response = requests.post(
             OLLAMA_URL,
             json=data_to_send,
@@ -78,6 +111,7 @@ def generate():
         response.raise_for_status()
 
         full_response = ""
+        # Accumuler les chunks de réponse
         for line in response.iter_lines():
             if line:
                 chunk = json.loads(line.decode('utf-8'))
@@ -85,19 +119,37 @@ def generate():
                 if chunk.get("done", False):
                     break
 
-        # Ajouter la réponse du bot avec un timestamp
+        # Heuristique pour les commandes de lumière
+        light_keywords = ["lumiere", "lumière", "allume", "allumer", "éteins", "eteins", "éteindre"]
+        command = {}
+        message = full_response.strip()
+        if any(kw in prompt.lower() for kw in light_keywords):
+            # Si le prompt contient un mot-clé, on essaie d'extraire le JSON à la fin de la réponse
+            lines = full_response.strip().splitlines()
+            if lines:
+                possible_json = lines[-1]
+                try:
+                    command = json.loads(possible_json)
+                    message = "\n".join(lines[:-1]).strip()
+                except Exception as ex:
+                    app.logger.error(f"Erreur lors du parsing du JSON de commande: {ex}")
+                    command = {}
+
+        # Ajouter la réponse du bot avec un timestamp au contexte
         context.append({
             "timestamp": get_timestamp(),
             "author": "bot",
             "content": full_response
         })
 
+        # Sauvegarder le contexte dans Redis (expiration d'une heure)
         redis_client.set(session_id, json.dumps(context))
         redis_client.expire(session_id, 3600)
 
         return jsonify({
             'model': model,
-            'response': full_response
+            'response': message,
+            'command': command
         })
 
     except requests.exceptions.RequestException as e:
@@ -106,8 +158,6 @@ def generate():
     except Exception as ex:
         app.logger.error(f"Erreur lors du parsing JSON: {ex}")
         return jsonify({"error": "Erreur de parsing JSON"}), 500
-
-
 
 @app.route('/get_context/<session_id>', methods=['GET'])
 def get_context(session_id):
