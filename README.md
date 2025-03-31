@@ -29,7 +29,7 @@ docker-compose up --build
 ```
 
 Les trois services vont démarrer et être disponibles aux ports suivants :
-- Flask API : http://localhost:5000
+- Flask API : http:////10.144.28.121:5000
 - Ollama : http://localhost:11434
 - Redis : localhost:6379
 

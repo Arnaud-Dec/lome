@@ -227,5 +227,5 @@ def get_context(session_id):
     return jsonify({"context": []}), 404
 
 if __name__ == '__main__':
-    app.logger.info(f"Démarrage du service Flask. En attente de connexion à Ollama sur {OLLAMA_URL}")
-    app.run(debug=True, host='0.0.0.0')
+    app.logger.info(f"Démarrage du service Flask sur ZeroTier (accessible via 10.144.28.121:5000)")
+    app.run(debug=True, host='0.0.0.0', port=5000)
