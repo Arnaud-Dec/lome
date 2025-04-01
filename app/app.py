@@ -123,7 +123,10 @@ def generate():
                 "Important :\n"
                 "- Si la demande **concerne le contrôle des lumières**, assure-toi que le JSON dans le champ \"command\" "
                 "est exactement généré comme dans l'exemple et qu'il n'inclut aucune annotation supplémentaire.\n"
-                "- Si la demande **n'est pas liée aux lumières**, réponds normalement dans le champ \"response\" et mets {} dans \"command\".\n\n"
+                "- Si la demande **n'est pas liée aux lumières**, réponds normalement dans le champ \"response\" et mets {} dans \"command\".\n"
+                "-la réponse doit être au format JSON valide, sans texte supplémentaire ni explications.\n"
+                "-Ne jamais inclure de texte supplémentaire en dehors du JSON.\n"
+                "-Ne pas dépacer 200 mots dans la réponse.\n\n"
                 
                 "Respecte strictement ces instructions pour éviter toute confusion et garantir une structure de réponse cohérente."
             )

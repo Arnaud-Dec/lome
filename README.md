@@ -29,9 +29,9 @@ docker-compose up --build
 ```
 
 Les trois services vont démarrer et être disponibles aux ports suivants :
-- Flask API : http:////10.144.28.121:5000
+- Flask API : http://10.144.28.121:5000
 - Ollama : http://localhost:11434
-- Redis : localhost:6379
+- Redis : http://localhost:6379
 
 ### 2. Vérifier les logs
 
@@ -76,7 +76,7 @@ POST /generate
 
 ```json
 {
-  "session_id": "1234",
+  "session_id": "test_session",
   "prompt": "Dis-moi une blague !",
   "model": "llama3.2"
 }
@@ -104,7 +104,7 @@ GET /get_context/<session_id>
 Exemple :
 
 ```bash
-curl -X GET http://localhost:5000/get_context/1234
+curl -X GET http://10.144.28.121:5000/get_context/test_session
 ```
 
 **Réponse:**
@@ -146,6 +146,9 @@ docker-compose build flask-app
 
 Vous pouvez tester directement depuis Postman ou avec `curl`. Assurez-vous que les services sont bien lancés et écoutez les bonnes URL.
 
+```bash
+curl -X POST http://10.144.28.121:5000/generate -H "Content-Type: application/json" -d '{"session_id": "test", "prompt": "salut"}'
+```
 ---
 
 ## 📚 Dépendances
@@ -175,6 +178,3 @@ pip install -r requirements.txt
 - Les logs Flask sont configurés pour afficher les erreurs et les requêtes importantes.
 
 ---
-
-Ce guide couvre les bases pour que vous puissiez démarrer, tester et comprendre le projet. N'hésitez pas si vous avez besoin de détails sur une partie spécifique ! 💡
-
